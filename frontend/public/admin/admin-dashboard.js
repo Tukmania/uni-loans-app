@@ -131,29 +131,6 @@ document.addEventListener('DOMContentLoaded', function() {
       console.error('Error setting up section links:', e);
     }
     
-    // Debug panel functionality
-    document.getElementById('refreshDataBtn').addEventListener('click', function() {
-      loadDashboardOverview();
-      loadLoanApplications('all');
-      alert('Refreshing all data...');
-    });
-
-    document.getElementById('testDashboardApi').addEventListener('click', function() {
-      testApi('/admin/dashboard-overview', 'Dashboard API');
-    });
-
-    document.getElementById('testLoansApi').addEventListener('click', function() {
-      testApi('/admin/loans', 'Loans API');
-    });
-
-    document.getElementById('testUsersApi').addEventListener('click', function() {
-      testApi('/admin/users', 'Users API');
-    });
-
-    document.getElementById('testLoanApplicationsApi').addEventListener('click', function() {
-      testApi('/admin/loan-applications', 'Loan Applications API');
-    });
-    
     // Function to load dashboard overview
     async function loadDashboardOverview() {
       console.log('Loading dashboard overview...');
@@ -1219,38 +1196,6 @@ document.addEventListener('DOMContentLoaded', function() {
         case 'Pending': return 'bg-warning text-dark';
         case 'Pending Review': return 'bg-info';
         default: return 'bg-secondary';
-      }
-    }
-
-    // Helper function to test API endpoints
-    async function testApi(endpoint, name) {
-      const resultsContainer = document.getElementById('apiTestResults');
-      resultsContainer.innerHTML = `<p>Testing ${name}...</p>`;
-      
-      try {
-        const response = await fetch(endpoint, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        const data = await response.json();
-        
-        resultsContainer.innerHTML = `
-          <p><strong>${name} Status:</strong> ${response.status}</p>
-          <p><strong>Data:</strong></p>
-          <pre style="max-height: 150px; overflow-y: auto;">${JSON.stringify(data, null, 2)}</pre>
-        `;
-        
-        console.log(`${name} Response:`, data);
-      } catch (error) {
-        resultsContainer.innerHTML = `
-          <p><strong>${name} Error:</strong></p>
-          <pre style="color: red;">${error.message}</pre>
-        `;
-        console.error(`${name} Error:`, error);
       }
     }
 
