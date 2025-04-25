@@ -112,7 +112,7 @@ document.addEventListener('DOMContentLoaded', function() {
       
       if (response.ok) {
         const documents = await response.json();
-        displayDocuments(documents);
+        displayUploadedDocuments(documents);
       } else {
         document.getElementById('uploadedDocumentsContainer').innerHTML = `
           <p class="text-center">Failed to load documents. Please refresh the page.</p>
@@ -126,137 +126,145 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
   
-  // Function to display documents
-  function displayDocuments(documents) {
+  // Add the same getCleanDocumentPath function for consistent path handling
+  function getCleanDocumentPath(originalPath) {
+    // Get only the relative path within uploads directory
+    let cleanPath = originalPath;
+    
+    // If it's a full URL or absolute path, extract just the filename with its subdirectory
+    if (originalPath.includes('/uploads/')) {
+      cleanPath = originalPath.substring(originalPath.indexOf('/uploads/') + 9);
+    } else if (originalPath.includes('\\uploads\\')) {
+      cleanPath = originalPath.substring(originalPath.indexOf('\\uploads\\') + 9);
+    }
+    
+    // Handle paths that don't contain 'uploads' explicitly
+    const directories = ['identity-documents', 'financial-documents', 'address-documents'];
+    for (const dir of directories) {
+      if (originalPath.includes(`/${dir}/`) || originalPath.includes(`\\${dir}\\`)) {
+        const dirIndex = originalPath.indexOf(dir);
+        if (dirIndex !== -1) {
+          cleanPath = originalPath.substring(dirIndex);
+          break;
+        }
+      }
+    }
+    
+    // Ensure no leading slash
+    if (cleanPath.startsWith('/')) {
+      cleanPath = cleanPath.substring(1);
+    }
+    
+    return cleanPath;
+  }
+  
+  // Update the function that displays uploaded documents to use the improved handling
+  function displayUploadedDocuments(documents) {
     const container = document.getElementById('uploadedDocumentsContainer');
     
     if (!documents || documents.length === 0) {
-      container.innerHTML = `
-        <p class="text-center">No documents uploaded yet.</p>
-      `;
+      container.innerHTML = '<p>No documents uploaded yet.</p>';
       return;
     }
     
-    // Group documents by category
-    const groupedDocuments = {
-      identity: [],
-      address: [],
-      financial: []
-    };
+    let html = '<div class="row">';
     
     documents.forEach(doc => {
-      if (groupedDocuments[doc.category]) {
-        groupedDocuments[doc.category].push(doc);
-      } else {
-        groupedDocuments.other = groupedDocuments.other || [];
-        groupedDocuments.other.push(doc);
+      const fileExtension = doc.path.split('.').pop().toLowerCase();
+      let iconClass = 'bi-file-earmark';
+      
+      if (['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
+        iconClass = 'bi-file-earmark-image';
+      } else if (fileExtension === 'pdf') {
+        iconClass = 'bi-file-earmark-pdf';
       }
+      
+      // Get clean path for download and view
+      const downloadPath = getCleanDocumentPath(doc.path);
+      
+      // Create a view URL that works for both direct and API-based viewing
+      let viewUrl = doc.path;
+      if (!viewUrl.startsWith('http') && !viewUrl.startsWith('/')) {
+        viewUrl = `/uploads/${downloadPath}`;
+      }
+      
+      html += `
+        <div class="col-md-4 mb-3">
+          <div class="card h-100">
+            <div class="card-body">
+              <div class="text-center mb-2">
+                <i class="bi ${iconClass} fs-1"></i>
+              </div>
+              <h5 class="card-title">${doc.documentType || doc.category || 'Document'}</h5>
+              <p class="small text-muted">
+                Category: ${doc.category || 'Unspecified'}<br>
+                Uploaded: ${new Date(doc.uploadDate || doc.createdAt || new Date()).toLocaleDateString()}
+              </p>
+              <div class="btn-group w-100">
+                <a href="${viewUrl}" class="btn btn-sm btn-primary" target="_blank">
+                  <i class="bi bi-eye"></i> View
+                </a>
+                <a href="#" class="btn btn-sm btn-success document-download-btn" data-path="${downloadPath}">
+                  <i class="bi bi-download"></i> Download
+                </a>
+                <button class="btn btn-sm btn-danger delete-document-btn" data-id="${doc._id}">
+                  <i class="bi bi-trash"></i> Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
     });
     
-    let html = '';
-    
-    // Identity documents
-    if (groupedDocuments.identity.length > 0) {
-      html += `<h5>Identity Documents</h5>`;
-      html += `<div class="row mb-3">`;
-      
-      groupedDocuments.identity.forEach(doc => {
-        html += createDocumentCard(doc);
-      });
-      
-      html += `</div>`;
-    }
-    
-    // Address documents
-    if (groupedDocuments.address.length > 0) {
-      html += `<h5>Address Documents</h5>`;
-      html += `<div class="row mb-3">`;
-      
-      groupedDocuments.address.forEach(doc => {
-        html += createDocumentCard(doc);
-      });
-      
-      html += `</div>`;
-    }
-    
-    // Financial documents
-    if (groupedDocuments.financial.length > 0) {
-      html += `<h5>Financial Documents</h5>`;
-      html += `<div class="row mb-3">`;
-      
-      groupedDocuments.financial.forEach(doc => {
-        html += createDocumentCard(doc);
-      });
-      
-      html += `</div>`;
-    }
-    
-    // Other documents
-    if (groupedDocuments.other && groupedDocuments.other.length > 0) {
-      html += `<h5>Other Documents</h5>`;
-      html += `<div class="row mb-3">`;
-      
-      groupedDocuments.other.forEach(doc => {
-        html += createDocumentCard(doc);
-      });
-      
-      html += `</div>`;
-    }
-    
+    html += '</div>';
     container.innerHTML = html;
     
-    // Add event listeners to delete buttons
+    // Add event handlers for document actions
+    addDocumentActionHandlers();
+  }
+  
+  // Function to add event handlers for document actions
+  function addDocumentActionHandlers() {
+    // Add handlers for document download buttons
+    document.querySelectorAll('.document-download-btn').forEach(button => {
+      button.addEventListener('click', function(e) {
+        e.preventDefault();
+        const docPath = this.getAttribute('data-path');
+        downloadDocument(docPath);
+      });
+    });
+    
+    // Add handlers for document delete buttons
     document.querySelectorAll('.delete-document-btn').forEach(button => {
       button.addEventListener('click', function() {
         const documentId = this.getAttribute('data-id');
-        if (confirm('Are you sure you want to delete this document?')) {
-          deleteDocument(documentId);
-        }
+        deleteDocument(documentId);
       });
     });
   }
   
-  // Function to create a document card
-  function createDocumentCard(doc) {
-    const fileExtension = doc.path.split('.').pop().toLowerCase();
-    let iconClass = 'bi-file-earmark';
+  // Improved document download function
+  function downloadDocument(docPath) {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     
-    if (['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
-      iconClass = 'bi-file-earmark-image';
-    } else if (fileExtension === 'pdf') {
-      iconClass = 'bi-file-earmark-pdf';
-    }
+    // Create a direct download link
+    const downloadUrl = `/user/download-document/${docPath}?token=${encodeURIComponent(token)}`;
     
-    // Extract document path for download link
-    let downloadPath = doc.path;
-    if (downloadPath.startsWith('/uploads/')) {
-      downloadPath = downloadPath.substring(9);
-    } else if (downloadPath.startsWith('uploads/')) {
-      downloadPath = downloadPath.substring(8);
-    }
+    // Create a temporary anchor element to trigger the download
+    const downloadLink = document.createElement('a');
+    downloadLink.href = downloadUrl;
+    downloadLink.download = docPath.split('/').pop(); // Extract filename for download attribute
+    downloadLink.style.display = 'none';
     
-    return `
-      <div class="col-md-4 mb-3">
-        <div class="card h-100">
-          <div class="card-body text-center">
-            <i class="bi ${iconClass} fs-1 mb-3"></i>
-            <h5 class="card-title">${doc.documentType || 'Document'}</h5>
-            <p class="card-text small text-muted">Uploaded: ${new Date(doc.uploadDate).toLocaleDateString()}</p>
-            <div class="btn-group" role="group">
-              <a href="${doc.path}" class="btn btn-sm btn-primary" target="_blank">
-                <i class="bi bi-eye"></i> View
-              </a>
-              <a href="/user/download-document/${downloadPath}" class="btn btn-sm btn-success">
-                <i class="bi bi-download"></i> Download
-              </a>
-              <button class="btn btn-sm btn-danger delete-document-btn" data-id="${doc._id}">
-                <i class="bi bi-trash"></i> Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
+    // Add to document, trigger click, then remove
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    
+    // Clean up after a short delay to ensure the download starts
+    setTimeout(() => {
+      document.body.removeChild(downloadLink);
+    }, 1000);
   }
   
   // Function to delete a document

@@ -39,10 +39,9 @@ document.addEventListener('DOMContentLoaded', function() {
       window.location.href = '../login.html';
     });
     
-    // Add debug info
+    // debug info
     console.log('Token:', token ? token.substring(0, 20) + '...' : 'none');
     
-    // Handle navigation between sections
     const navLinks = document.querySelectorAll('.nav-link');
     const sections = document.querySelectorAll('.dashboard-section');
     
@@ -511,19 +510,33 @@ document.addEventListener('DOMContentLoaded', function() {
         cleanPath = originalPath.substring(originalPath.indexOf('\\uploads\\') + 9);
       }
       
-      // Extract just the subdirectory and filename part
-      const pathParts = cleanPath.split('/');
-      if (pathParts.length >= 2) {
-        // Join the document type directory and filename
-        // e.g., "identity-documents/filename.pdf"
-        return pathParts.slice(-2).join('/');
+      // Handle paths that don't contain 'uploads' explicitly
+      const directories = ['identity-documents', 'financial-documents', 'address-documents'];
+      for (const dir of directories) {
+        if (originalPath.includes(`/${dir}/`) || originalPath.includes(`\\${dir}\\`)) {
+          const dirIndex = originalPath.indexOf(dir);
+          if (dirIndex !== -1) {
+            cleanPath = originalPath.substring(dirIndex);
+            break;
+          }
+        }
+      }
+      
+      // Ensure no leading slash
+      if (cleanPath.startsWith('/')) {
+        cleanPath = cleanPath.substring(1);
       }
       
       return cleanPath;
     }
     
-    // Updated createDocumentCard function with simplified path handling
+    // Updated createDocumentCard function with improved path handling
     function createDocumentCard(doc) {
+      if (!doc || !doc.path) {
+        console.error('Invalid document object:', doc);
+        return '<div class="col-md-4 mb-3"><div class="card"><div class="card-body">Invalid document</div></div></div>';
+      }
+      
       // Get file extension
       const fileExtension = doc.path.split('.').pop().toLowerCase();
       let iconClass = 'bi-file-earmark';
@@ -538,6 +551,12 @@ document.addEventListener('DOMContentLoaded', function() {
       // Get clean path for download
       const downloadPath = getCleanDocumentPath(doc.path);
       
+      // Create a view URL that works for both direct and API-based viewing
+      let viewUrl = doc.path;
+      if (!viewUrl.startsWith('http') && !viewUrl.startsWith('/')) {
+        viewUrl = `/uploads/${downloadPath}`;
+      }
+      
       return `
         <div class="col-md-4 mb-3">
           <div class="card">
@@ -551,7 +570,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 Uploaded: ${new Date(doc.uploadDate || doc.createdAt || new Date()).toLocaleDateString()}
               </p>
               <div class="btn-group w-100">
-                <a href="${doc.path}" class="btn btn-sm btn-primary" target="_blank">
+                <a href="${viewUrl}" class="btn btn-sm btn-primary" target="_blank">
                   <i class="bi bi-eye"></i> View
                 </a>
                 <a href="#" class="btn btn-sm btn-success download-doc-btn" data-path="${downloadPath}">
@@ -575,22 +594,27 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     }
     
-    // Function to handle document download with proper authentication
+    // Improved document download function that works more reliably
     function downloadDocument(docPath) {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       
-      // Create an invisible iframe for the download
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      document.body.appendChild(iframe);
+      // Create a direct download link
+      const downloadUrl = `/admin/download-document/${docPath}?token=${encodeURIComponent(token)}`;
       
-      // Set the iframe source with authentication in the URL
-      iframe.src = `/admin/download-document/${docPath}?token=${encodeURIComponent(token)}`;
+      // Create a temporary anchor element to trigger the download
+      const downloadLink = document.createElement('a');
+      downloadLink.href = downloadUrl;
+      downloadLink.download = docPath.split('/').pop(); // Extract filename for download attribute
+      downloadLink.style.display = 'none';
       
-      // Clean up the iframe after download starts
+      // Add to document, trigger click, then remove
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      
+      // Clean up after a short delay to ensure the download starts
       setTimeout(() => {
-        document.body.removeChild(iframe);
-      }, 5000);
+        document.body.removeChild(downloadLink);
+      }, 1000);
     }
     
     // Function to update application status
@@ -742,9 +766,249 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Function to view user details
-    function viewUserDetails(userId) {
-      // Implement user details view
-      alert('View user details functionality will be implemented here');
+    async function viewUserDetails(userId) {
+      try {
+        // Create and show a modal for user details
+        const modalHtml = `
+          <div class="modal fade" id="userDetailsModal" tabindex="-1" aria-labelledby="userDetailsModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title" id="userDetailsModalLabel">User Details</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                  <div id="userDetailsContainer">
+                    <p class="text-center">Loading user details...</p>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+        
+        // Add modal to body if it doesn't exist yet
+        if (!document.getElementById('userDetailsModal')) {
+          const modalContainer = document.createElement('div');
+          modalContainer.innerHTML = modalHtml;
+          document.body.appendChild(modalContainer);
+        }
+        
+        // Show modal
+        const userModal = new bootstrap.Modal(document.getElementById('userDetailsModal'));
+        userModal.show();
+        
+        const container = document.getElementById('userDetailsContainer');
+        
+        // Fetch user details and documents
+        const response = await fetch(`/admin/user-documents/${userId}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          container.innerHTML = `
+            <div class="alert alert-danger">
+              Failed to load user details. Status: ${response.status}
+            </div>
+          `;
+          return;
+        }
+        
+        const data = await response.json();
+        const { user, documents } = data;
+        
+        // Fetch additional user information
+        const userResponse = await fetch(`/admin/users/${userId}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        let userDetails = {};
+        if (userResponse.ok) {
+          userDetails = await userResponse.json();
+        }
+        
+        // Fetch document status
+        const statusResponse = await fetch(`/admin/user-document-status/${userId}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        let documentStatus = {
+          documentStatus: {
+            hasIdentityDocuments: false,
+            hasFinancialDocuments: false,
+            hasFinancialData: false,
+            canApplyForLoan: false
+          }
+        };
+        
+        if (statusResponse.ok) {
+          documentStatus = await statusResponse.json();
+        }
+        
+        // Create user info HTML
+        let userHtml = `
+          <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between">
+              <h5 class="mb-0">User Information</h5>
+              ${userDetails.isVerified ? 
+                '<span class="badge bg-success">Verified</span>' : 
+                '<span class="badge bg-warning text-dark">Pending Verification</span>'
+              }
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6">
+                  <p><strong>ID:</strong> ${user._id}</p>
+                  <p><strong>Name:</strong> ${user.name || userDetails.fullName || 'Not provided'}</p>
+                  <p><strong>Email:</strong> ${user.email}</p>
+                  <p><strong>Role:</strong> ${userDetails.role || 'User'}</p>
+                </div>
+                <div class="col-md-6">
+                  <p><strong>Registration Date:</strong> ${userDetails.createdAt ? new Date(userDetails.createdAt).toLocaleDateString() : 'Unknown'}</p>
+                  <p><strong>Last Update:</strong> ${userDetails.updatedAt ? new Date(userDetails.updatedAt).toLocaleDateString() : 'Unknown'}</p>
+                  <p><strong>Phone:</strong> ${userDetails.phoneNumber || 'Not provided'}</p>
+                  <p><strong>Address:</strong> ${userDetails.address || 'Not provided'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+        
+        // Create document status HTML
+        const { documentStatus: status } = documentStatus;
+        let statusHtml = `
+          <div class="card mb-4">
+            <div class="card-header">
+              <h5 class="mb-0">Document Status</h5>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6">
+                  <p>
+                    <strong>Identity Documents:</strong> 
+                    ${status.hasIdentityDocuments ? 
+                      '<span class="badge bg-success">Provided</span>' : 
+                      '<span class="badge bg-danger">Missing</span>'
+                    }
+                  </p>
+                  <p>
+                    <strong>Financial Documents:</strong> 
+                    ${status.hasFinancialDocuments ? 
+                      '<span class="badge bg-success">Provided</span>' : 
+                      '<span class="badge bg-danger">Missing</span>'
+                    }
+                  </p>
+                </div>
+                <div class="col-md-6">
+                  <p>
+                    <strong>Financial Data:</strong> 
+                    ${status.hasFinancialData ? 
+                      '<span class="badge bg-success">Provided</span>' : 
+                      '<span class="badge bg-danger">Missing</span>'
+                    }
+                  </p>
+                  <p>
+                    <strong>Loan Application Eligibility:</strong> 
+                    ${status.canApplyForLoan ? 
+                      '<span class="badge bg-success">Eligible</span>' : 
+                      '<span class="badge bg-danger">Not Eligible</span>'
+                    }
+                  </p>
+                </div>
+              </div>
+              ${!status.canApplyForLoan ? `
+                <div class="alert alert-warning mt-3">
+                  <p><strong>Missing requirements:</strong></p>
+                  <ul>
+                    ${!status.hasIdentityDocuments ? '<li>Identity documents</li>' : ''}
+                    ${!status.hasFinancialDocuments ? '<li>Financial documents</li>' : ''}
+                    ${!status.hasFinancialData ? '<li>Financial data</li>' : ''}
+                  </ul>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        `;
+        
+        // Create documents HTML
+        let documentsHtml = `
+          <div class="card">
+            <div class="card-header">
+              <h5 class="mb-0">User Documents (${documents.length})</h5>
+            </div>
+            <div class="card-body">
+        `;
+        
+        if (documents.length === 0) {
+          documentsHtml += `<p class="text-center">No documents uploaded yet</p>`;
+        } else {
+          documentsHtml += `<div class="row">`;
+          documents.forEach(doc => {
+            documentsHtml += createDocumentCard(doc);
+          });
+          documentsHtml += `</div>`;
+        }
+        
+        documentsHtml += `
+            </div>
+          </div>
+        `;
+        
+        // Add verify button if user is not verified
+        let verifyHtml = '';
+        if (userDetails && !userDetails.isVerified) {
+          verifyHtml = `
+            <div class="text-center mt-4">
+              <button class="btn btn-success" id="verifyUserBtn" data-id="${userId}">
+                <i class="bi bi-check-circle"></i> Verify User
+              </button>
+            </div>
+          `;
+        }
+        
+        // Combine all sections
+        container.innerHTML = userHtml + statusHtml + documentsHtml + verifyHtml;
+        
+        // Add document download handlers
+        addDocumentDownloadHandlers();
+        
+        // Add verify button handler if it exists
+        const verifyButton = document.getElementById('verifyUserBtn');
+        if (verifyButton) {
+          verifyButton.addEventListener('click', function() {
+            const userId = this.getAttribute('data-id');
+            verifyUser(userId);
+            // Close the modal after verification
+            const modal = bootstrap.Modal.getInstance(document.getElementById('userDetailsModal'));
+            modal.hide();
+          });
+        }
+      } catch (error) {
+        console.error('Error viewing user details:', error);
+        const container = document.getElementById('userDetailsContainer');
+        if (container) {
+          container.innerHTML = `
+            <div class="alert alert-danger">
+              <p>Error loading user details: ${error.message}</p>
+            </div>
+          `;
+        }
+      }
     }
     
     // Function to verify a user

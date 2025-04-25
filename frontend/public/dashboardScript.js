@@ -281,9 +281,44 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
+  // Improved getCleanDocumentPath function for user section
+  function getCleanDocumentPath(originalPath) {
+    // Get only the relative path within uploads directory
+    let cleanPath = originalPath;
+    
+    // If it's a full URL or absolute path, extract just the filename with its subdirectory
+    if (originalPath.includes('/uploads/')) {
+      cleanPath = originalPath.substring(originalPath.indexOf('/uploads/') + 9);
+    } else if (originalPath.includes('\\uploads\\')) {
+      cleanPath = originalPath.substring(originalPath.indexOf('\\uploads\\') + 9);
+    }
+    
+    // Handle paths that don't contain 'uploads' explicitly
+    const directories = ['identity-documents', 'financial-documents', 'address-documents'];
+    for (const dir of directories) {
+      if (originalPath.includes(`/${dir}/`) || originalPath.includes(`\\${dir}\\`)) {
+        const dirIndex = originalPath.indexOf(dir);
+        if (dirIndex !== -1) {
+          cleanPath = originalPath.substring(dirIndex);
+          break;
+        }
+      }
+    }
+    
+    // Ensure no leading slash
+    if (cleanPath.startsWith('/')) {
+      cleanPath = cleanPath.substring(1);
+    }
+    
+    return cleanPath;
+  }
+
+  // Update the fetchDocuments function with improved document handling
   async function fetchDocuments() {
     try {
       const userId = localStorage.getItem('userId') || sessionStorage.getItem('userId');
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      
       const response = await fetch(`/user/documents/${userId}`, {
         method: 'GET',
         headers: {
@@ -311,18 +346,20 @@ document.addEventListener('DOMContentLoaded', function() {
           const fileExtension = doc.path.split('.').pop().toLowerCase();
           let iconClass = 'bi-file-earmark';
           
+          // Choose icon based on file type
           if (['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
             iconClass = 'bi-file-earmark-image';
           } else if (fileExtension === 'pdf') {
             iconClass = 'bi-file-earmark-pdf';
           }
           
-          // Extract document path for download link
-          let downloadPath = doc.path;
-          if (downloadPath.startsWith('/uploads/')) {
-            downloadPath = downloadPath.substring(9);
-          } else if (downloadPath.startsWith('uploads/')) {
-            downloadPath = downloadPath.substring(8);
+          // Get clean path for download and view
+          const downloadPath = getCleanDocumentPath(doc.path);
+          
+          // Create a view URL that works for both direct and API-based viewing
+          let viewUrl = doc.path;
+          if (!viewUrl.startsWith('http') && !viewUrl.startsWith('/')) {
+            viewUrl = `/uploads/${downloadPath}`;
           }
           
           documentsHtml += `
@@ -330,13 +367,13 @@ document.addEventListener('DOMContentLoaded', function() {
               <div class="card h-100">
                 <div class="card-body text-center">
                   <i class="bi ${iconClass} fs-1 mb-3"></i>
-                  <h5 class="card-title">${doc.documentType || `Document ${index + 1}`}</h5>
+                  <h5 class="card-title">${doc.documentType || doc.category || `Document ${index + 1}`}</h5>
                   <p class="card-text small text-muted">${doc.category || 'Unknown type'}</p>
                   <div class="btn-group">
-                    <a href="${doc.path}" class="btn btn-primary btn-sm" target="_blank">
+                    <a href="${viewUrl}" class="btn btn-primary btn-sm document-view-btn" target="_blank" data-path="${downloadPath}">
                       <i class="bi bi-eye"></i> View
                     </a>
-                    <a href="/user/download-document/${downloadPath}" class="btn btn-success btn-sm">
+                    <a href="#" class="btn btn-success btn-sm document-download-btn" data-path="${downloadPath}">
                       <i class="bi bi-download"></i> Download
                     </a>
                   </div>
@@ -356,10 +393,71 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
         
         documentsContainer.innerHTML = documentsHtml;
+        
+        // Add event listeners for document download buttons
+        addDocumentEventHandlers();
       }
     } catch (error) {
       console.error('Error fetching documents:', error);
+      const documentsContainer = document.getElementById('documentsContainer');
+      if (documentsContainer) {
+        documentsContainer.innerHTML = `
+          <div class="alert alert-danger">
+            <p>Error loading documents: ${error.message}</p>
+            <a href="upload-documents.html" class="btn btn-primary">
+              <i class="bi bi-upload"></i> Upload Documents
+            </a>
+          </div>
+        `;
+      }
     }
+  }
+
+  // Add event handlers for document viewing and downloading
+  function addDocumentEventHandlers() {
+    // Add event listeners for document download buttons
+    document.querySelectorAll('.document-download-btn').forEach(button => {
+      button.addEventListener('click', function(e) {
+        e.preventDefault();
+        const docPath = this.getAttribute('data-path');
+        downloadDocument(docPath);
+      });
+    });
+    
+    // Add event listeners for document view buttons (fallback in case direct viewing fails)
+    document.querySelectorAll('.document-view-btn').forEach(button => {
+      button.addEventListener('click', function(e) {
+        // No need to prevent default here - we want it to try the direct link first
+        // This is a fallback for if the direct link fails
+        const docPath = this.getAttribute('data-path');
+        // We could store the original click event and only trigger this if the view fails
+        // But for now, just log it
+        console.log('Document view clicked for path:', docPath);
+      });
+    });
+  }
+
+  // Function to download documents using anchor method (more reliable than iframe)
+  function downloadDocument(docPath) {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    
+    // Create a direct download link
+    const downloadUrl = `/user/download-document/${docPath}?token=${encodeURIComponent(token)}`;
+    
+    // Create a temporary anchor element to trigger the download
+    const downloadLink = document.createElement('a');
+    downloadLink.href = downloadUrl;
+    downloadLink.download = docPath.split('/').pop(); // Extract filename for download attribute
+    downloadLink.style.display = 'none';
+    
+    // Add to document, trigger click, then remove
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    
+    // Clean up after a short delay to ensure the download starts
+    setTimeout(() => {
+      document.body.removeChild(downloadLink);
+    }, 1000);
   }
 
   // Update dashboard to show document status

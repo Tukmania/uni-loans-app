@@ -66,7 +66,7 @@ document.addEventListener('DOMContentLoaded', function() {
           }
           
           if (!status.hasFinancialData) {
-            message += '<a href="financial-information.html" class="btn btn-primary mb-2">Complete Financial Information</a>';
+            message += '<a href="financial-data.html" class="btn btn-primary mb-2">Complete Financial Information</a>';
           }
           
           message += '<a href="dashboard.html" class="btn btn-outline-secondary">Back to Dashboard</a>';
@@ -84,7 +84,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // If documents are uploaded, show the form and continue with normal flow
-        console.log('User has all required documents, showing form');
         initializeForm();
       } catch (error) {
         console.error('Error checking document status:', error);
