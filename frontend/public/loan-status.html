@@ -81,6 +81,48 @@
           </div>
         </div>
 
+        <!-- Rejection Reason Section (for rejected loans) -->
+        <div class="card mb-4 loan-card bg-light" id="rejectionSection" style="display: none;">
+          <div class="card-body">
+            <h3 class="card-title text-danger">
+              <i class="bi bi-exclamation-circle"></i> Application Rejected
+            </h3>
+            <div class="alert alert-danger">
+              <h5><i class="bi bi-info-circle"></i> Reason for Rejection:</h5>
+              <p id="rejectionReason" class="mb-0">No specific reason provided.</p>
+            </div>
+            <div class="mt-3">
+              <p>If you have any questions about your loan rejection or would like to reapply with additional information, please contact our support team or visit your university's financial aid office.</p>
+              <div class="d-grid gap-2 d-md-flex justify-content-md-start mt-4">
+                <a href="dashboard.html" class="btn btn-outline-primary">
+                  <i class="bi bi-house"></i> Back to Dashboard
+                </a>
+                <a href="#" class="btn btn-outline-secondary" id="contactSupportBtn">
+                  <i class="bi bi-chat-dots"></i> Contact Support
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Certificate Section (for fully repaid loans) -->
+        <div class="card mb-4 loan-card" id="certificateSection" style="display: none;">
+          <div class="card-body">
+            <h3 class="card-title">
+              <i class="bi bi-award"></i> Repayment Certificate
+            </h3>
+            <div class="alert alert-success">
+              <h5><i class="bi bi-trophy"></i> Congratulations!</h5>
+              <p>You have fully repaid your loan. You can now view and download your official repayment certificate.</p>
+            </div>
+            <div class="d-grid gap-2 mt-3">
+              <a id="certificateLink" href="#" class="btn btn-primary">
+                <i class="bi bi-award"></i> View Repayment Certificate
+              </a>
+            </div>
+          </div>
+        </div>
+
         <!-- Repayment Section -->
         <div class="card mb-4 loan-card" id="repaymentSection" style="display: none;">
           <div class="card-body">
@@ -140,7 +182,7 @@
 
   <footer class="bg-light p-4 mt-5">
     <div class="container text-center">
-      <p>&copy; 2024 University Loans Application System</p>
+      <p>&copy; 2025 University Loans Application System</p>
       <div>
         <a href="#" class="text-decoration-none me-3">Privacy Policy</a>
         <a href="#" class="text-decoration-none me-3">Terms of Service</a>

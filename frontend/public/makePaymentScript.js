@@ -329,6 +329,11 @@ document.addEventListener('DOMContentLoaded', function() {
               <h5><i class="bi bi-trophy"></i> Congratulations!</h5>
               <p class="mb-0">You have fully repaid your loan. No further payments are required.</p>
             </div>
+            <p class="mt-2">
+              <a href="loan-receipt.html?id=${data.loan._id}" class="btn btn-outline-success">
+                <i class="bi bi-award"></i> View Repayment Certificate
+              </a>
+            </p>
             ` : ''}
             
             <div class="alert alert-info mt-3">

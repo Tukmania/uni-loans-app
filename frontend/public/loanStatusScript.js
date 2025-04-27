@@ -135,18 +135,82 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
     `;
     
-    // Show repayment section for all loans
-    document.getElementById('repaymentSection').style.display = 'block';
+    // Helper function to safely show/hide elements
+    const safelySetDisplayStyle = (elementId, displayValue) => {
+      const element = document.getElementById(elementId);
+      if (element) {
+        element.style.display = displayValue;
+      }
+    };
+    
+    // Show repayment section for all loans except rejected ones
+    if (loan.status !== 'Rejected') {
+      safelySetDisplayStyle('repaymentSection', 'block');
+    } else {
+      safelySetDisplayStyle('repaymentSection', 'none');
+    }
     
     // Show payment section only for approved loans
     if (loan.status === 'Approved') {
-      document.getElementById('makePaymentSection').style.display = 'block';
+      safelySetDisplayStyle('makePaymentSection', 'block');
       // Set the loan ID in the hidden field
-      document.getElementById('loanId').value = loan._id;
+      const loanIdField = document.getElementById('loanId');
+      if (loanIdField) {
+        loanIdField.value = loan._id;
+      }
       // Set max amount for payment
-      document.getElementById('amountPaid').max = loan.remainingBalance;
+      const amountPaidField = document.getElementById('amountPaid');
+      if (amountPaidField) {
+        amountPaidField.max = loan.remainingBalance;
+      }
     } else {
-      document.getElementById('makePaymentSection').style.display = 'none';
+      safelySetDisplayStyle('makePaymentSection', 'none');
+    }
+    
+    // Show certificate section for repaid loans
+    if (loan.status === 'Repaid') {
+      const certificateSection = document.getElementById('certificateSection');
+      const certificateLink = document.getElementById('certificateLink');
+      
+      if (certificateSection) {
+        certificateSection.style.display = 'block';
+      }
+      
+      if (certificateLink) {
+        certificateLink.href = `loan-receipt.html?id=${loan._id}`;
+      }
+    } else {
+      safelySetDisplayStyle('certificateSection', 'none');
+    }
+    
+    // Show rejection reason section for rejected loans
+    if (loan.status === 'Rejected') {
+      const rejectionSection = document.getElementById('rejectionSection');
+      const rejectionReason = document.getElementById('rejectionReason');
+      const contactSupportBtn = document.getElementById('contactSupportBtn');
+      
+      if (rejectionSection && rejectionReason) {
+        // Check if there are admin notes (rejection reason)
+        if (loan.adminNotes && loan.adminNotes.trim() !== '') {
+          rejectionReason.textContent = loan.adminNotes;
+        } else {
+          rejectionReason.textContent = 'No specific reason provided. Please contact the financial aid office for more information.';
+        }
+        
+        // Show the rejection section
+        rejectionSection.style.display = 'block';
+        
+        // Add event listener to contact support button
+        if (contactSupportBtn) {
+          contactSupportBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            // Open contact support modal or redirect to support page
+            alert('You will be redirected to the support page. This feature is coming soon.');
+          });
+        }
+      }
+    } else {
+      safelySetDisplayStyle('rejectionSection', 'none');
     }
   }
   
