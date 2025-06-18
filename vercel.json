@@ -1,0 +1,33 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/uni-loans-app/backend/server.js"
+    },
+    {
+      "source": "/uploads/(.*)",
+      "destination": "/uni-loans-app/backend/uploads/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/uni-loans-app/frontend/public/$1"
+    }
+  ],
+  "builds": [
+    {
+      "src": "uni-loans-app/backend/server.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "uni-loans-app/frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "build" }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1.js"
+    }
+  ]
+} 
